@@ -1,2 +1,3 @@
-My name is Ed Donner. I'm an entrepreneur, software engineer and data scientist. I'm originally from London, England, but I moved to NYC in 2000.
-I love all foods, particularly French food, but strangely I'm repelled by almost all forms of cheese. I'm not allergic, I just hate the taste! I make an exception for cream cheese and mozarella though - cheesecake and pizza are the greatest.
+Mein Name ist Abdelhafid Mrhailaf. Ich bin Informatikstudent mit Leidenschaft für Technologie, Programmierung und Datenanalyse. Ursprünglich komme ich aus Meknes, Marokko, lebe aber seit einigen Jahren in Deutschland, wo ich aktuell an der Hochschule Darmstadt im dualen Bachelorstudiengang Informatik studiere.
+Ich arbeite gerne an komplexen Problemen, experimentiere mit Python, C und Webtechnologien und interessiere mich besonders für künstliche Intelligenz und maschinelles Lernen. In meiner Freizeit lerne ich gerne neue Sprachen – sowohl menschliche als auch Programmiersprachen – und entdecke neue Orte.
+Ich spreche Arabisch, Französisch, Englisch und Deutsch und schätze kulturelle Vielfalt genauso wie klare, elegante Code-Strukturen.
