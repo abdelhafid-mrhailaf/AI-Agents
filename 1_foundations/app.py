@@ -62,12 +62,13 @@ record_unknown_question_json = {
             "question": {
                 "type": "string",
                 "description": "The question that couldn't be answered"
-            },
+            }
         },
         "required": ["question"],
         "additionalProperties": False
     }
 }
+
 
 tools = [{"type": "function", "function": record_user_details_json},
         {"type": "function", "function": record_unknown_question_json}]
