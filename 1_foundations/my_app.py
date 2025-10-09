@@ -5,6 +5,16 @@ import os
 import requests
 from pypdf import PdfReader
 import gradio as gr
+from pydantic import BaseModel
+
+
+class Evaluation(BaseModel):
+    is_acceptable: bool
+    feedback: str
+
+
+name = "Abdelhafid Mrhailaf"
+
 
 #read environemet variablen
 load_dotenv(override=True)
@@ -34,11 +44,55 @@ If the user is engaging in discussion, try to steer them towards getting in touc
 system_prompt += f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
 system_prompt += f"With this context, please chat with the user, always staying in character as {name}."
 
+evaluator_system_prompt = f"You are an evaluator that decides whether a response to a question is acceptable. \
+You are provided with a conversation between a User and an Agent. Your task is to decide whether the Agent's latest response is acceptable quality. \
+The Agent is playing the role of {name} and is representing {name} on their website. \
+The Agent has been instructed to be professional and engaging, as if talking to a potential client or future employer who came across the website. \
+The Agent has been provided with context on {name} in the form of their summary and LinkedIn details. Here's the information:"
+
+evaluator_system_prompt += f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
+evaluator_system_prompt += f"With this context, please evaluate the latest response, replying with whether the response is acceptable and your feedback."
+
+
+
+#evaluator user prompt
+def evaluator_user_prompt(reply, message, history):
+    user_prompt = f"Here's the conversation between the User and the Agent: \n\n{history}\n\n"
+    user_prompt += f"Here's the latest message from the User: \n\n{message}\n\n"
+    user_prompt += f"Here's the latest response from the Agent: \n\n{reply}\n\n"
+    user_prompt += "Please evaluate the response, replying with whether it is acceptable and your feedback."
+    return user_prompt
+
+
+
+#evaluating the result using gemini
+gemini = OpenAI(
+    api_key=os.getenv("GOOGLE_API_KEY"),
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
+
+
+def evaluate(reply, message, history) -> Evaluation:
+    messages = [{"role": "system", "content": evaluator_system_prompt}] + [{"role": "user", "content": evaluator_user_prompt(reply, message, history)}]
+    response = gemini.beta.chat.completions.parse(model="gemini-2.0-flash", messages=messages, response_format=Evaluation)
+    print(response.choices[0].message.parsed)
+    return response.choices[0].message.parsed
+
+
+
+def rerun(reply, message, history, feedback):
+    updated_system_prompt = system_prompt + "\n\n## Previous answer rejected\nYou just tried to reply, but the quality control rejected your reply\n"
+    updated_system_prompt += f"## Your attempted answer:\n{reply}\n\n"
+    updated_system_prompt += f"## Reason for rejection:\n{feedback}\n\n"
+    messages = [{"role": "system", "content": updated_system_prompt}] + history + [{"role": "user", "content": message}]
+    response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages)
+    return response
 
 #Pushover App
 pushover_user = os.getenv("PUSHOVER_USER")
 pushover_token = os.getenv("PUSHOVER_TOKEN")
 pushober_url = "https://api.pushover.net/1/messages.json"
+
 
 #Funktion that handles the pushes
 def push(text):
@@ -132,6 +186,17 @@ def handle_tool_calls(tool_calls):
     return results
 
 
+def handle_evaluation_call(reply, message, history):
+    evaluation = evaluate(reply, message, history)
+    evaluation.is_acceptable = False
+    if evaluation.is_acceptable:
+        print("Passed evaluation - returning reply")
+    else:
+        print("Failed evaluation - retrying")
+        print(evaluation.feedback)
+        reply = rerun(reply, message, history, evaluation.feedback)
+    return reply
+
 def chat(message, history):
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     done = False
@@ -140,13 +205,15 @@ def chat(message, history):
         finish_reason = response.choices[0].finish_reason
 
         if finish_reason=="tool_calls":
-            message = response.choices[0].message
-            tool_calls = message.tool_calls
+            response_message = response.choices[0].message
+            tool_calls = response_message.tool_calls
             results = handle_tool_calls(tool_calls) #getting the tool call from the response of the LLM
-            messages.append(message)
+            messages.append(response_message)
             messages.extend(results)
         else:
             done = True
+            reply = response.choices[0].message.content
+            response = handle_evaluation_call(reply, message, history)
     return response.choices[0].message.content
 
 
