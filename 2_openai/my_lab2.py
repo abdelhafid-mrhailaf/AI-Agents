@@ -12,6 +12,7 @@ load_dotenv(override=True)
 
 
 class SRA:
+    @function_tool
     def send_email(self, subject, email_text):
         sg = sendgrid.SendGridAPIClient(api_key=os.environ.get('SENDGRID_API_KEY'))
         from_email = Email("abdelhafid.mrhailaf@stud.h-da.de")
