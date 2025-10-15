@@ -19,7 +19,7 @@ class WebSearchItemList(BaseModel):
 
 class EvaluateWebSearchItem(BaseModel):
     is_accepted: bool
-    reason: str =  Field(description="why the sugession of the AI is accepted or not")
+    reason: str =  Field(description="why the suggestion of the AI is accepted or not")
 
 
 planner_agent = Agent(
@@ -65,8 +65,7 @@ async def perform_plan(query: str) -> WebSearchItemList:
         planner_agent,
         f"Query: {query}",
     )
-    result = WebSearchItemList(result)
-    print(f"Will perform {len(result.final_output.searches)} searches")
+    #print(f"Will perform {len(result.final_output.searches)} searches")
     return result.final_output_as(WebSearchItemList)
 
 async def evaluate_websearch_item(query: str, webSearchItem: WebSearchItem) -> EvaluateWebSearchItem:
@@ -102,4 +101,5 @@ async def validate_websearch_list(query: str, webSearchItemlist: WebSearchItemLi
     for item in webSearchItemlist.searches:
         validatedItem = await validate_websearch_item(query, item)
         validatedWebSearchItemList.append(validatedItem)
-    return validatedWebSearchItemList
+    return WebSearchItemList(searches=validatedWebSearchItemList)  
+
