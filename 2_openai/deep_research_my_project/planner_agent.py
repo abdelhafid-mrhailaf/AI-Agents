@@ -13,20 +13,20 @@ class WebSearchItem(BaseModel):
     reason: str = Field(description="Your reasoning for why this search is important to the query.")
     query: str = Field(description="The search term to use for the web search.")
 
-class WebSeachItemList(BaseModel):
+class WebSearchItemList(BaseModel):
     searches: list[WebSearchItem] = Field(description="A list of web searches to perform to best answer the query.")
 
 
 class EvaluateWebSearchItem(BaseModel):
     is_accepted: bool
-    reason: Field(description="why the sugession of the AI is accepted or not")
+    reason: str =  Field(description="why the sugession of the AI is accepted or not")
 
 
 planner_agent = Agent(
     name="PlannerAgent",
-    instruction=INSTRUCTIONS_PLANNER,
+    instructions=INSTRUCTIONS_PLANNER,
     model="gpt-4o-mini",
-    output_type=WebSeachItemList
+    output_type=WebSearchItemList
 )
 
 
@@ -37,7 +37,7 @@ INSTRUCTIONS_VALIDATOR = "You are an evaluator. Given a query and a WebSearchIte
                 Use the query to judge how relevant and useful the search is."
 
 
-INSTRCUTRION_REGENERATOR = "You are a regenerator. Given a user query,\
+INSTRUCTIONS_REGENERATOR = "You are a regenerator. Given a user query,\
                 a rejected WebSearchItem, and validator feedback, generate a new, more relevant\
                 and precise search query that fixes the issues noted. Focus on key entities, context, and clarity. Output a WebSearchItem with: reason\
                 (why this new search is important to the query) and query (the improved search term to use)."
@@ -45,7 +45,7 @@ INSTRCUTRION_REGENERATOR = "You are a regenerator. Given a user query,\
 
 regenerator_agent = Agent(
     name="RegeneratorAgent",
-    instructions=INSTRCUTRION_REGENERATOR,
+    instructions=INSTRUCTIONS_REGENERATOR,
     model="gpt-4o-mini",
     output_type=WebSearchItem
 )
@@ -59,16 +59,47 @@ evaluator_agent = Agent(
 
 
 
+async def perform_plan(query: str) -> WebSearchItemList:
+    print("Planning searches...")
+    result = await Runner.run(
+        planner_agent,
+        f"Query: {query}",
+    )
+    result = WebSearchItemList(result)
+    print(f"Will perform {len(result.final_output.searches)} searches")
+    return result.final_output_as(WebSearchItemList)
 
-async def perform_search(query: str) -> WebSeachItemList:
-    with trace("Search"):
-        print("Planning searches...")
-        result = await Runner.run(
-            planner_agent,
-            f"Query: {query}",
+async def evaluate_websearch_item(query: str, webSearchItem: WebSearchItem) -> EvaluateWebSearchItem:
+    result_evaluation = await Runner.run(
+        evaluator_agent,
+        f"Query: {query}, WebSearchItem: {webSearchItem}"
+    )
+    return result_evaluation.final_output_as(EvaluateWebSearchItem)
+
+async def regenerator_websearch_item(query: str, rejectedItem: WebSearchItem, evaluationObject: EvaluateWebSearchItem) -> WebSearchItem:
+    print("generating a new Item")
+    newItem = await Runner.run(
+        regenerator_agent,
+        f"Query: {query}, Rejected item: {rejectedItem}, validator feedback: {evaluationObject}"
         )
+    print(f"Regeneration of the prompt for the keyword result: {rejectedItem.query}")
+    return newItem.final_output_as(WebSearchItem)
 
-async def validate_websearch_item(webSearchItem: WebSearchItem) -> EvaluateWebSearchItem:
-    
+async def validate_websearch_item(query: str, webSearchItem: WebSearchItem) -> WebSearchItem:
+    resultEvaluation = await evaluate_websearch_item(query, webSearchItem)
     EXTEND_LIMIT_OF_CALL = 0
-    while not webSearchItem.is_accepted and EXTEND_LIMIT_OF_CALL != 10:
+    while not resultEvaluation.is_accepted and EXTEND_LIMIT_OF_CALL != 10:
+        webSearchItem = await regenerator_websearch_item(query, webSearchItem, resultEvaluation)
+        resultEvaluation = await evaluate_websearch_item(query, webSearchItem)
+        EXTEND_LIMIT_OF_CALL += 1
+    if EXTEND_LIMIT_OF_CALL >= 10:
+        raise RuntimeError("Loop exceeded allowed iteration count (10)")
+    return webSearchItem
+
+
+async def validate_websearch_list(query: str, webSearchItemlist: WebSearchItemList) -> WebSearchItemList:
+    validatedWebSearchItemList = []
+    for item in webSearchItemlist.searches:
+        validatedItem = await validate_websearch_item(query, item)
+        validatedWebSearchItemList.append(validatedItem)
+    return validatedWebSearchItemList
