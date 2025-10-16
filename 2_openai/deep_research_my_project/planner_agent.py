@@ -103,3 +103,8 @@ async def validate_websearch_list(query: str, webSearchItemlist: WebSearchItemLi
         validatedWebSearchItemList.append(validatedItem)
     return WebSearchItemList(searches=validatedWebSearchItemList)  
 
+
+async def plan_deep_search(query) -> WebSearchItemList:
+    webSearchItemListObject = await perform_plan(query)
+    webSearchItemListObject = await validate_websearch_list(query, webSearchItemListObject)
+    return webSearchItemListObject
