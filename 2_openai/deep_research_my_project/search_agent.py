@@ -76,6 +76,9 @@ async def main():
         print(await search(searchObject))
         print("________________________________________________________")
     results = await perform_web_search(query_list)
+    for i, result in enumerate(results, start=1):
+        with open(f"summary{i}.md", "w", encoding="utf-8") as file:
+            file.write(result)
     print(results)
 
 if __name__ == "__main__":
