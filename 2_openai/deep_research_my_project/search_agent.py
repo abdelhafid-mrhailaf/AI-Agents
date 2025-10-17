@@ -70,8 +70,11 @@ async def main():
     query_list = await plan_deep_search(
         "What are the most useful frameworks for developing AI Chatbots that help IT help-desks solve their daily tasks"
     )
-    print(query_list.searches[0])
-    print(await search(query_list.searches[0]))
+    for searchObject in query_list.searches:
+        print("________________________________________________________")
+        print(searchObject)
+        print(await search(searchObject))
+        print("________________________________________________________")
     results = await perform_web_search(query_list)
     print(results)
 
