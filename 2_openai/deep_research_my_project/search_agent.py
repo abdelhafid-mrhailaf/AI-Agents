@@ -1,5 +1,9 @@
-from agents import Agent, WebSearchTool, ModelSettings
+from agents import Agent, WebSearchTool, ModelSettings, Runner
 from dotenv import load_dotenv
+from planner_agent import WebSearchItemList, WebSearchItem, plan_deep_search
+import asyncio
+from sys import exception
+
 
 load_dotenv(override=True)
 VALIDATOR_INSTRUCTION = "You are a validation assistant. Given a search term and a generated summary, your task is to verify whether the summary adheres to the INSTRUCTIONS. The summary should be 2–3 paragraphs, under 300 words, concise, and focused only on the essential points from the web search results. Writing should be compact, possibly using fragments or short phrases, and free of commentary, filler, or unnecessary detail. The output must contain only the summary itself, no explanations or formatting. You will assess compliance and quality. If the summary violates any rule, briefly describe the issues. Always output your evaluation in three parts: Compliance (Yes/No), Issues (if any), and Quality Score (0–10). Be objective, professional, and concise in your assessment."
@@ -33,3 +37,44 @@ search_agent = Agent(
     model="gpt-4o-mini",
     model_settings=ModelSettings(tool_choice="required"),
 )
+
+
+
+
+
+async def search(item: WebSearchItem):
+    input = f"Search Search term:: {item.query}\n, Reason for searching: {item.reason}"
+    result = await Runner.run(
+        search_agent,
+        input
+    )
+    return str(result.final_output)
+
+
+async def perform_web_search(webSearchItemList: WebSearchItemList):
+    print("Searching...")
+    num_completed = 0
+    tasks = [asyncio.create_task(search(item)) for item in webSearchItemList.searches]
+    results = []
+    for task in asyncio.as_completed(tasks):
+        result = await task
+        if result is not None:
+            results.append(result)
+        num_completed += 1
+        print(f"Searching... {num_completed}/{len(tasks)} completed")
+    print("Finished searching")
+    return results
+
+
+async def main():
+    query_list = await plan_deep_search(
+        "What are the most useful frameworks for developing AI Chatbots that help IT help-desks solve their daily tasks"
+    )
+    print(query_list.searches[0])
+    print(await search(query_list.searches[0]))
+    results = await perform_web_search(query_list)
+    print(results)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
