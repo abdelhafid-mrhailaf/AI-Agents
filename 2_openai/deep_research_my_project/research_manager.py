@@ -12,9 +12,6 @@ class ResearchManager:
             print("Starting research....")
             search_plan = await planner_agent.plan_deep_search(query)
             search_result = await search_agent.perform_web_search(search_plan)
-            #with open("search.md", "r") as file:
-            #    text = file.read()
-            #report = text
             report = await writer_agent.report_writer(query ,search_result)
             print(report)
             await email_agent.send_email_report(report.markdown_report)
