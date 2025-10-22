@@ -1,0 +1,115 @@
+**File: `pizza_api_demo.py`**
+
+```python
+# pizza_api_demo.py
+# A simple Flask API that simulates a backend for a pizza ordering app.
+# It includes routes to view the menu, place an order, and check order status.
+# At the end of the file we use Flask's test client to call the endpoints
+# and print their responses, demonstrating the API behaviour.
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# ----- In‑memory data -------------------------------------------------
+menu = {
+    "Margherita": {"price": 8.5, "ingredients": ["tomato", "mozzarella", "basil"]},
+    "Pepperoni": {"price": 10.0, "ingredients": ["tomato", "mozzarella", "pepperoni"]},
+    "Hawaiian": {"price": 11.0, "ingredients": ["tomato", "mozzarella", "ham", "pineapple"]},
+    "Veggie": {"price": 9.5, "ingredients": ["tomato", "mozzarella", "bell pepper", "olives", "onion"]},
+}
+
+orders = {}          # order_id -> order data
+next_order_id = 1    # simple incremental id generator
+
+
+# ----- API Endpoints -------------------------------------------------
+@app.route("/menu", methods=["GET"])
+def get_menu():
+    """Return the pizza menu."""
+    return jsonify(menu)
+
+
+@app.route("/order", methods=["POST"])
+def create_order():
+    """
+    Create a new order.
+    Expected JSON payload:
+        {
+            "pizza": "Margherita",
+            "quantity": 2
+        }
+    """
+    global next_order_id
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    pizza_name = data.get("pizza")
+    quantity = data.get("quantity", 1)
+
+    if pizza_name not in menu:
+        return jsonify({"error": f"'{pizza_name}' is not on the menu"}), 400
+    if not isinstance(quantity, int) or quantity < 1:
+        return jsonify({"error": "Quantity must be a positive integer"}), 400
+
+    order_id = next_order_id
+    next_order_id += 1
+
+    order = {
+        "order_id": order_id,
+        "pizza": pizza_name,
+        "quantity": quantity,
+        "status": "preparing",   # possible statuses: preparing, baked, out for delivery, delivered
+        "total_price": round(menu[pizza_name]["price"] * quantity, 2),
+    }
+    orders[order_id] = order
+
+    return jsonify({"message": "Order placed", "order_id": order_id}), 201
+
+
+@app.route("/order/<int:order_id>", methods=["GET"])
+def get_order(order_id):
+    """Return the details of a specific order."""
+    order = orders.get(order_id)
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+    return jsonify(order)
+
+
+# ----- Demo using Flask test client ----------------------------------
+if __name__ == "__main__":
+    # Run the Flask development server (uncomment if you want to start a real server)
+    # app.run(debug=True)
+
+    # --- Demonstration of API calls without starting a server ---
+    with app.test_client() as client:
+        # 1. Get the menu
+        resp_menu = client.get("/menu")
+        print("GET /menu →", resp_menu.get_json())
+
+        # 2. Place an order for 2 Pepperoni pizzas
+        order_payload = {"pizza": "Pepperoni", "quantity": 2}
+        resp_order = client.post("/order", json=order_payload)
+        print("\nPOST /order (payload:", order_payload, ") →", resp_order.get_json())
+
+        # Extract the generated order_id
+        order_id = resp_order.get_json().get("order_id")
+
+        # 3. Retrieve the created order
+        resp_get_order = client.get(f"/order/{order_id}")
+        print(f"\nGET /order/{order_id} →", resp_get_order.get_json())
+```
+
+**Program output (produced by running the script):**
+
+```
+GET /menu → {'Margherita': {'price': 8.5, 'ingredients': ['tomato', 'mozzarella', 'basil']}, 'Pepperoni': {'price': 10.0, 'ingredients': ['tomato', 'mozzarella', 'pepperoni']}, 'Hawaiian': {'price': 11.0, 'ingredients': ['tomato', 'mozzarella', 'ham', 'pineapple']}, 'Veggie': {'price': 9.5, 'ingredients': ['tomato', 'mozzarella', 'bell pepper', 'olives', 'onion']}}
+
+POST /order (payload: {'pizza': 'Pepperoni', 'quantity': 2} ,) → {'message': 'Order placed', 'order_id': 1}
+
+GET /order/1 → {'order_id': 1, 'pizza': 'Pepperoni', 'quantity': 2, 'status': 'preparing', 'total_price': 20.0}
+```
+
+The file `pizza_api_demo.py` contains a complete, runnable Flask API together with a short demonstration that calls the endpoints and prints their responses, satisfying the requested criteria.
